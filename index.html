@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonsuz Yukarı Koşu</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #888; }
+    canvas { display: block; background: #888; }
+  </style>
+</head>
+<body>
+  <canvas id="oyunPanosu"></canvas>
+  <script>
+    const pano = document.getElementById('oyunPanosu');
+    const context = pano.getContext('2d');
+    let genislik, yukseklik;
+    function yenidenBoyutla() {
+      genislik = pano.width = window.innerWidth;
+      yukseklik = pano.height = window.innerHeight;
+    }
+    window.addEventListener('resize', yenidenBoyutla);
+    yenidenBoyutla();
+
+    const sutunSayisi = 3;
+    let sutunGenisligi;
+    const kosucuSol = new Image(); kosucuSol.src = 'assets/fat_left.png';
+    const kosucuSag = new Image(); kosucuSag.src = 'assets/fat_right.png';
+    const bombaResmi = new Image(); bombaResmi.src = 'assets/bomb.png';
+    const patlamaResmi = new Image(); patlamaResmi.src = 'assets/squib.png';
+
+    const oyuncu = { sutun: 1, genislik: 120, yukseklik: 120 };
+    const temelHiz = 4;
+    let hiz = temelHiz;
+    const engelAraligi = 90;
+    let kareSayaci = 0;
+    let puan = 0;
+    let engeller = [];
+    let oyunBitti = false;
+    let patlamaKonumu = null;
+    let hatOffset = 0;
+
+    function baslat() {
+      hiz = temelHiz;
+      kareSayaci = 0;
+      puan = 0;
+      engeller = [];
+      oyunBitti = false;
+      patlamaKonumu = null;
+      hatOffset = 0;
+      dongu();
+    }
+
+    function engelOlustur() {
+      const sutun = Math.floor(Math.random() * sutunSayisi);
+      engeller.push({ sutun, y: -oyuncu.yukseklik });
+    }
+
+    function guncelle() {
+      if (oyunBitti) return;
+      kareSayaci++;
+      hatOffset += hiz;
+      if (kareSayaci % 6 === 0) puan++;
+      if (puan > 0 && puan % 100 === 0) hiz += 0.5;
+      if (kareSayaci % engelAraligi === 0) engelOlustur();
+      engeller.forEach(e => e.y += hiz);
+      engeller = engeller.filter(e => e.y <= yukseklik + oyuncu.yukseklik);
+      engeller.forEach(e => {
+        const px = oyuncu.sutun * sutunGenisligi + (sutunGenisligi - oyuncu.genislik) / 2;
+        const py = yukseklik - oyuncu.yukseklik - 10;
+        const ox = e.sutun * sutunGenisligi + (sutunGenisligi - oyuncu.genislik) / 2;
+        const oy = e.y;
+        if (Math.abs(px - ox) < oyuncu.genislik && Math.abs(py - oy) < oyuncu.yukseklik) {
+          oyunBitti = true;
+          patlamaKonumu = { x: ox, y: oy };
+        }
+      });
+    }
+
+    function ciz() {
+      context.clearRect(0, 0, genislik, yukseklik);
+      context.fillStyle = '#888';
+      context.fillRect(0, 0, genislik, yukseklik);
+      sutunGenisligi = genislik / sutunSayisi;
+      context.strokeStyle = '#fff';
+      context.lineWidth = 4;
+      context.setLineDash([20, 20]);
+      for (let i = 1; i < sutunSayisi; i++) {
+        context.beginPath();
+        context.lineDashOffset = -hatOffset % 40;
+        const x = i * sutunGenisligi;
+        context.moveTo(x, 0);
+        context.lineTo(x, yukseklik);
+        context.stroke();
+      }
+
+      const zaman = Date.now();
+      const kosResim = (Math.floor(zaman / 500) % 2 === 0) ? kosucuSol : kosucuSag;
+      const px = oyuncu.sutun * sutunGenisligi + (sutunGenisligi - oyuncu.genislik) / 2;
+      const py = yukseklik - oyuncu.yukseklik - 10;
+      if (!oyunBitti) context.drawImage(kosResim, px, py, oyuncu.genislik, oyuncu.yukseklik);
+
+      engeller.forEach(e => {
+        const ox = e.sutun * sutunGenisligi + (sutunGenisligi - oyuncu.genislik) / 2;
+        context.drawImage(bombaResmi, ox, e.y, oyuncu.genislik, oyuncu.yukseklik);
+      });
+
+      if (oyunBitti && patlamaKonumu) {
+        context.drawImage(patlamaResmi, patlamaKonumu.x, patlamaKonumu.y, oyuncu.genislik, oyuncu.yukseklik);
+        context.fillStyle = 'white';
+        context.font = '32px sans-serif';
+        context.textAlign = 'center';
+        context.fillText('Yeniden Başlatmak için R tuşuna bas', genislik / 2, yukseklik / 2 + 50);
+      }
+
+      context.fillStyle = 'white';
+      context.font = '24px sans-serif';
+      context.textAlign = 'left';
+      context.fillText(`Puan: ${puan}`, 10, 30);
+    }
+
+    function dongu() {
+      guncelle();
+      ciz();
+      if (!oyunBitti) requestAnimationFrame(dongu);
+    }
+
+    window.addEventListener('keydown', e => {
+      if (oyunBitti && e.code === 'KeyR') {
+        baslat();
+      }
+      if (!oyunBitti) {
+        if (e.code === 'ArrowLeft' && oyuncu.sutun > 0) oyuncu.sutun--;
+        if (e.code === 'ArrowRight' && oyuncu.sutun < sutunSayisi - 1) oyuncu.sutun++;
+      }
+    });
+
+    baslat();
+  </script>
+</body>
+</html>
